@@ -13,6 +13,12 @@
 # Installation:
 # The Ultralytics library can be installed using the command: 'pip install ultralytics'
 # For development purposes, you can install the package in editable mode with: 'pip install -e .'
+# then
+# pip install .[dev] .[extra]
+# pip install .[export]
+# pip install .[explorer]
+# pip install .[logging]
+#
 # This approach allows for real-time code modifications without the need for re-installation.
 
 # Documentation:

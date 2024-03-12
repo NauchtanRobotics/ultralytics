@@ -116,7 +116,7 @@ class BaseTrainer:
 
         self.batch_size = self.args.batch
         self.epochs = self.args.epochs
-        self.start_epoch = 0
+        self.start_epoch = self.args.start_epoch
         if RANK == -1:
             print_args(vars(self.args))
 
@@ -301,7 +301,7 @@ class BaseTrainer:
         # Scheduler
         self._setup_scheduler()
         self.stopper, self.stop = EarlyStopping(patience=self.args.patience), False
-        self.resume_training(ckpt)
+        self.resume_training(ckpt)  # just determine what the start epoch from check point dict. Doesn't actual train.
         self.scheduler.last_epoch = self.start_epoch - 1  # do not move
         self.run_callbacks("on_pretrain_routine_end")
 

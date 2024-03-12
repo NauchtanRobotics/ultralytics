@@ -668,7 +668,8 @@ class Model(nn.Module):
                 except (PermissionError, ModuleNotFoundError):
                     # Ignore PermissionError and ModuleNotFoundError which indicates hub-sdk not installed
                     pass
-
+        if args.get("start_epoch") is not None:
+            self.trainer.start_epoch = args.get("start_epoch")
         self.trainer.hub_session = self.session  # attach optional HUB session
         self.trainer.train()
         # Update model and cfg after training

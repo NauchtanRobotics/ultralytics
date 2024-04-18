@@ -14,7 +14,7 @@ from .conv import Conv
 from .transformer import MLP, DeformableTransformerDecoder, DeformableTransformerDecoderLayer
 from .utils import bias_init_with_prob, linear_init
 
-__all__ = "Detect", "Segment", "Pose", "Classify", "OBB", "RTDETRDecoder"
+__all__ = "Detect", "DetectSev", "Segment", "Pose", "Classify", "OBB", "RTDETRDecoder"
 
 
 class Detect(nn.Module):
@@ -145,6 +145,35 @@ class OBB(Detect):
     def decode_bboxes(self, bboxes, anchors):
         """Decode rotated bounding boxes."""
         return dist2rbox(bboxes, self.angle, anchors, dim=1)
+
+
+class DetectSev(Detect):
+    """YOLOv8 Sev detection head for detection with rotation models."""
+
+    def __init__(self, nc=80, ne=1, ch=()):
+        """Initialize DetectSev with number of classes `nc` and layer channels `ch`."""
+        super().__init__(nc, ch, nr=5)
+        self.ne = ne  # number of extra parameters
+        self.detect = Detect.forward
+
+        c4 = max(ch[0] // 4, self.ne)
+        self.cv4 = nn.ModuleList(nn.Sequential(Conv(x, c4, 3), Conv(c4, c4, 3), nn.Conv2d(c4, self.ne, 1)) for x in ch)
+
+    def forward(self, x):
+        """Concatenates and returns predicted bounding boxes and class probabilities."""
+        bs = x[0].shape[0]  # batch size
+        severity = torch.cat([self.cv4[i](x[i]).view(bs, self.ne, -1) for i in range(self.nl)], 2)  # theta logits
+        # No need to set `severity` as an attribute so that `decode_bboxes` can use it.
+        severity = (severity.sigmoid() + 1) * 5  # [1, 5]  TODO: Do I need to reverse this somewhere else?
+
+        x = self.detect(self, x)
+        if self.training:
+            return x, severity
+        return torch.cat([x, severity], 1) if self.export else (torch.cat([x[0], severity], 1), (x[1], severity))
+
+    def decode_bboxes(self, bboxes, anchors):
+        """Decode bounding boxes that have severity appended."""
+        return dist2bbox(bboxes[..., :4], anchors, dim=1)
 
 
 class Pose(Detect):

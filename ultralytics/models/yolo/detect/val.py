@@ -13,6 +13,9 @@ from ultralytics.utils.checks import check_requirements
 from ultralytics.utils.metrics import ConfusionMatrix, DetMetrics, box_iou
 from ultralytics.utils.plotting import output_to_target, plot_images
 
+IDX_CONF = 5  # was 4 for regular bboxes
+IDX_CLASS = 6  # was 5 for regular bboxes
+
 
 class DetectionValidator(BaseValidator):
     """
@@ -140,10 +143,10 @@ class DetectionValidator(BaseValidator):
 
             # Predictions
             if self.args.single_cls:
-                pred[:, 5] = 0
+                pred[:, IDX_CLASS] = 0
             predn = self._prepare_pred(pred, pbatch)
-            stat["conf"] = predn[:, 4]
-            stat["pred_cls"] = predn[:, 5]
+            stat["conf"] = predn[:, IDX_CONF]
+            stat["pred_cls"] = predn[:, IDX_CLASS]
 
             # Evaluate
             if nl:
@@ -207,7 +210,7 @@ class DetectionValidator(BaseValidator):
             (torch.Tensor): Correct prediction matrix of shape [N, 10] for 10 IoU levels.
         """
         iou = box_iou(gt_bboxes, detections[:, :4])
-        return self.match_predictions(detections[:, 5], gt_cls, iou)
+        return self.match_predictions(detections[:, IDX_CLASS], gt_cls, iou)
 
     def build_dataset(self, img_path, mode="val", batch=None):
         """
@@ -271,7 +274,7 @@ class DetectionValidator(BaseValidator):
                     "category_id": self.class_map[int(p[5])]
                     + (1 if self.is_lvis else 0),  # index starts from 1 if it's lvis
                     "bbox": [round(x, 3) for x in b],
-                    "score": round(p[4], 5),
+                    "score": round(p[IDX_CONF], 5),
                 }
             )
 

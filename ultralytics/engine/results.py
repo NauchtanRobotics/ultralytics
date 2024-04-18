@@ -9,6 +9,7 @@ from copy import deepcopy
 from functools import lru_cache
 from pathlib import Path
 
+import numpy
 import numpy as np
 import torch
 
@@ -94,7 +95,9 @@ class Results(SimpleClass):
         tojson(normalize=False): Converts detection results to JSON format.
     """
 
-    def __init__(self, orig_img, path, names, boxes=None, masks=None, probs=None, keypoints=None, obb=None) -> None:
+    def __init__(
+        self, orig_img, path, names, boxes=None, masks=None, probs=None, keypoints=None, obb=None, sev=None
+    ) -> None:
         """
         Initialize the Results class.
 
@@ -115,6 +118,7 @@ class Results(SimpleClass):
         self.probs = Probs(probs) if probs is not None else None
         self.keypoints = Keypoints(keypoints, self.orig_shape) if keypoints is not None else None
         self.obb = OBB(obb, self.orig_shape) if obb is not None else None
+        self.sev = Severity(sev, self.orig_shape) if sev is not None else None
         self.speed = {"preprocess": None, "inference": None, "postprocess": None}  # milliseconds per image
         self.names = names
         self.path = path
@@ -132,7 +136,7 @@ class Results(SimpleClass):
             if v is not None:
                 return len(v)
 
-    def update(self, boxes=None, masks=None, probs=None, obb=None):
+    def update(self, boxes=None, masks=None, probs=None, obb=None, sev=None):
         """Update the boxes, masks, and probs attributes of the Results object."""
         if boxes is not None:
             self.boxes = Boxes(ops.clip_boxes(boxes, self.orig_shape), self.orig_shape)
@@ -142,6 +146,8 @@ class Results(SimpleClass):
             self.probs = probs
         if obb is not None:
             self.obb = OBB(obb, self.orig_shape)
+        if sev is not None:
+            self.sev = Severity(ops.clip_boxes(sev, self.orig_shape), self.orig_shape)  # clip only affects cols 0:4
 
     def _apply(self, fn, *args, **kwargs):
         """
@@ -244,8 +250,15 @@ class Results(SimpleClass):
             img = (self.orig_img[0].detach().permute(1, 2, 0).contiguous() * 255).to(torch.uint8).cpu().numpy()
 
         names = self.names
+        show_boxes = boxes
         is_obb = self.obb is not None
-        pred_boxes, show_boxes = self.obb if is_obb else self.boxes, boxes
+        is_sev = self.sev is not None
+        if is_obb:
+            pred_boxes = self.obb
+        elif is_sev:
+            pred_boxes = self.sev
+        else:
+            pred_boxes = self.boxes
         pred_masks, show_masks = self.masks, masks
         pred_probs, show_probs = self.probs, probs
         annotator = Annotator(
@@ -277,7 +290,7 @@ class Results(SimpleClass):
                 c, conf, id = int(d.cls), float(d.conf) if conf else None, None if d.id is None else int(d.id.item())
                 name = ("" if id is None else f"id:{id} ") + names[c]
                 label = (f"{name} {conf:.2f}" if conf else name) if labels else None
-                box = d.xyxyxyxy.reshape(-1, 4, 2).squeeze() if is_obb else d.xyxy.squeeze()
+                box = d.xyxyxyxy.reshape(-1, 4, 2).squeeze() if is_obb else d.xyxy.squeeze()  # don't need r, s to plot
                 annotator.box_label(box, label, color=colors(c, True), rotated=is_obb)
 
         # Plot Classify results
@@ -336,7 +349,13 @@ class Results(SimpleClass):
             save_conf (bool): save confidence score or not.
         """
         is_obb = self.obb is not None
-        boxes = self.obb if is_obb else self.boxes
+        is_sev = self.sev is not None
+        if is_obb:
+            boxes = self.obb
+        elif is_sev:
+            boxes = self.sev
+        else:
+            boxes = self.boxes
         masks = self.masks
         probs = self.probs
         kpts = self.keypoints
@@ -348,7 +367,12 @@ class Results(SimpleClass):
             # Detect/segment/pose
             for j, d in enumerate(boxes):
                 c, conf, id = int(d.cls), float(d.conf), None if d.id is None else int(d.id.item())
-                line = (c, *(d.xyxyxyxyn.view(-1) if is_obb else d.xywhn.view(-1)))
+                if is_obb:
+                    line = (c, *(d.xyxyxyxyn.view(-1)))
+                elif is_sev:
+                    line = (c, *(d.xywhns.view(-1)))  # includes severity field
+                else:  # Detection - orthogonal bounding boxes
+                    line = (c, *(d.xywhn.view(-1)))
                 if masks:
                     seg = masks[j].xyn[0].copy().reshape(-1)  # reversed mask.xyn, (n,2) to (n*2)
                     line = (c, *seg)
@@ -393,7 +417,7 @@ class Results(SimpleClass):
 
         # Create list of detection dictionaries
         results = []
-        data = self.boxes.data.cpu().tolist()
+        data = self.boxes.data.cpu().tolist()  # not suitable for OBB or sev
         h, w = self.orig_shape if normalize else (1, 1)
         for i, row in enumerate(data):  # xyxy, track_id if tracking, conf, class_id
             box = {
@@ -741,3 +765,116 @@ class OBB(BaseTensor):
         y2 = self.xyxyxyxy[..., 1].max(1).values
         xyxy = [x1, y1, x2, y2]
         return np.stack(xyxy, axis=-1) if isinstance(self.data, np.ndarray) else torch.stack(xyxy, dim=-1)
+
+
+class Severity(BaseTensor):
+    """
+    A class for storing and manipulating Oriented Bounding Boxes (OBB).
+
+    Args:
+        data (torch.Tensor | numpy.ndarray): # xyxy, severity, track_id, conf, cls ???
+            or initialise with:
+                    xywh, severity, track_id, conf, cls
+
+            A tensor or numpy array containing the detection boxes,
+            with shape (num_boxes, 7) or (num_boxes, 8). The last two columns contain confidence and class values.
+            If present, the third last column contains track IDs, and the fifth column from the left contains rotation.
+        orig_shape (tuple): Original image size, in the format (height, width).
+
+    Attributes:
+        data (torch.Tensor): The raw Severity tensor (alias for `boxes`).
+
+    Properties:
+        conf (torch.Tensor | numpy.ndarray): The confidence values of the boxes.
+        cls (torch.Tensor | numpy.ndarray): The class values of the boxes.
+        id (torch.Tensor | numpy.ndarray): The track IDs of the boxes (if available).
+
+        Predictions are done at full scale. We need to be able to plot at original scale. However, we only save
+        normalised data (xywhns):
+
+        xywhs (torch.Tensor | numpy.ndarray): Normalized [x, y, width, height] - raw preds - precursor to xywhns
+        xywhns (torch.Tensor | numpy.ndarray): Normalized [x, y, width, height, severity]  - for saving
+        xyxy (torch.Tensor | numpy.ndarray): Boxes in [x1, y1, x2, y2] format.             - for plotting
+
+    Methods:
+        cpu(): Move the object to CPU memory.
+        numpy(): Convert the object to a numpy array.
+        cuda(): Move the object to CUDA memory.
+        to(*args, **kwargs): Move the object to the specified device.
+    """
+
+    def __init__(self, data, orig_shape) -> None:
+        """Initialize the Boxes class."""
+        if data.ndim == 1:
+            data = data[None, :]
+        n = data.shape[-1]
+        assert n in {7, 8}, f"expected 7 or 8 values but got {n}"  # xywh, severity, track_id, conf, cls
+        super().__init__(data, orig_shape)  # sets the data attribute.
+        self.is_track = n == 8
+        self.orig_shape = orig_shape
+
+    @property
+    def conf(self):
+        """Return the confidence values of the boxes."""
+        return self.data[:, -2]
+
+    @property
+    def cls(self):
+        """Return the class values of the boxes."""
+        return self.data[:, -1]
+
+    @property
+    def id(self):
+        """Return the track IDs of the boxes (if available)."""
+        return self.data[:, -3] if self.is_track else None
+
+    @property
+    def xywhs(self):
+        """Used by ultralytics.trackers.byte_tracker.BYTETracker.update()
+           Raw predictions are in xywhs??"""
+        # #  Code to use if raw predictions are in xyxys as for Boxes.
+        # if isinstance(self.xywh, torch.Tensor):
+        #     xywhs = torch.cat([self.xywh, self.data[:, 5]], dim=1)  # could xywh and data be different types?
+        # else:  # must be numpy
+        #     xywhs = numpy.stack([self.xywh, self.data[:, 5]], dim=1)  # do I need to clone data[:, 5] to be safe?
+        # return xywhs
+        return self.data[:, :5]  # this version when raw predictions are in xywhs
+
+    @property
+    def xywh(self):
+        """Just provided as a descriptive precursor to xyxy."""
+        return self.data[:, :4]  # ops.xyxy2xywh(self.xyxy)
+
+    @property
+    @lru_cache(maxsize=2)
+    def xyxy(self):
+        """Return the boxes in xyxy format. Required for plotting."""
+        return ops.xywh2xyxy(self.xywh)  # self.data[:, :4]
+
+    # @property
+    # @lru_cache(maxsize=2)
+    # def xyxyn(self):  # WHEN WOULD WE NEED THIS?
+    #     """Return the boxes in xyxy format normalized by original image size."""
+    #     xyxy = self.xyxy.clone() if isinstance(self.xyxy, torch.Tensor) else np.copy(self.xyxy)
+    #     xyxy[..., [0, 2]] /= self.orig_shape[1]
+    #     xyxy[..., [1, 3]] /= self.orig_shape[0]
+    #     return xyxy
+
+    @property
+    @lru_cache(maxsize=2)
+    def xywhn(self):
+        """Return the boxes in xywh format normalized by original image size. Required as a precursor to xywhns."""
+        xywhn = ops.xyxy2xywh(self.xyxy)
+        xywhn[..., [0, 2]] /= self.orig_shape[1]
+        xywhn[..., [1, 3]] /= self.orig_shape[0]
+        return xywhn
+
+    @property
+    @lru_cache(maxsize=2)
+    def xywhns(self):
+        """Return the boxes in xywh format normalized by original image size. We only save normalized data."""
+        if isinstance(self.xywhn, torch.Tensor):
+            xywhns = torch.cat([self.xywhn, self.data[:, 5]], dim=1)  # could xywhn and data be different types?
+        else:  # i.e numpy array
+            xywhns = numpy.stack([self.xywhn, self.data[:, 5]], dim=1)  # do I need to clone data[:, 5] to be safe?
+        return xywhns

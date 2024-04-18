@@ -259,7 +259,12 @@ class BYTETracker:
         removed_stracks = []
 
         scores = results.conf
-        bboxes = results.xywhr if hasattr(results, "xywhr") else results.xywh
+        if hasattr(results, "xywhr"):
+            bboxes = results.xywhr
+        elif hasattr(results, "xywhs"):
+            bboxes = results.xywhs
+        else:
+            bboxes = results.xywh
         # Add index
         bboxes = np.concatenate([bboxes, np.arange(len(bboxes)).reshape(-1, 1)], axis=-1)
         cls = results.cls

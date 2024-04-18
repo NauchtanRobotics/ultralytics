@@ -193,6 +193,8 @@ class TaskAlignedAssigner(nn.Module):
         # Assigned target boxes, (b, max_num_obj, 4) -> (b, h*w, 4)
         target_bboxes = gt_bboxes.view(-1, gt_bboxes.shape[-1])[target_gt_idx]
 
+        # TODO: debug check that this can handle an extra field for severity. Should do if gt_bboxes does.
+
         # Assigned target scores
         target_labels.clamp_(0)
 

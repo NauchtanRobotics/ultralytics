@@ -177,6 +177,8 @@ def non_max_suppression(
 ):
     """
     Perform non-maximum suppression (NMS) on a set of boxes, with support for masks and multiple labels per box.
+    Works for extra continuous predictors like rotation angle, severity as these extra data is appended independent
+    of NMS processing, same as masks.
 
     Args:
         prediction (torch.Tensor): A tensor of shape (batch_size, num_classes + 4 + num_masks, num_boxes)
@@ -199,7 +201,7 @@ def non_max_suppression(
         max_nms (int): The maximum number of boxes into torchvision.ops.nms().
         max_wh (int): The maximum box width and height in pixels.
         in_place (bool): If True, the input prediction tensor will be modified in place.
-
+        rotated: Set to true for object-oriented (rotated) bounding boxes (OBB)
     Returns:
         (List[torch.Tensor]): A list of length batch_size, where each element is a tensor of
             shape (num_boxes, 6 + num_masks) containing the kept boxes, with columns
@@ -215,7 +217,7 @@ def non_max_suppression(
 
     bs = prediction.shape[0]  # batch size
     nc = nc or (prediction.shape[1] - 4)  # number of classes
-    nm = prediction.shape[1] - nc - 4
+    nm = prediction.shape[1] - nc - 4  # remaining prediction field such as rotation alpha, severity or masks.
     mi = 4 + nc  # mask start index
     xc = prediction[:, 4:mi].amax(1) > conf_thres  # candidates
 
@@ -251,7 +253,7 @@ def non_max_suppression(
             continue
 
         # Detections matrix nx6 (xyxy, conf, cls)
-        box, cls, mask = x.split((4, nc, nm), 1)
+        box, cls, mask = x.split((4, nc, nm), 1)  # 'mask' encompasses all predictors surplus to bboxes, e.g. OBB angle
 
         if multi_label:
             i, j = torch.where(cls > conf_thres)

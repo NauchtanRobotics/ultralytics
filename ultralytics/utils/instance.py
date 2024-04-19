@@ -28,7 +28,9 @@ to_4tuple = _ntuple(4)
 # `ltwh` means left top and width, height(COCO format)
 _formats = ["xyxy", "xywh", "ltwh"]
 
-__all__ = ("Bboxes",)  # tuple or list
+__all__ = ("Bboxes", "Instances", "NUM_FIELDS_SBOX")  # tuple or list
+
+NUM_FIELDS_SBOX = 5
 
 
 class Bboxes:
@@ -51,7 +53,9 @@ class Bboxes:
         assert format in _formats, f"Invalid bounding box format: {format}, format must be one of {_formats}"
         bboxes = bboxes[None, :] if bboxes.ndim == 1 else bboxes
         assert bboxes.ndim == 2
-        assert bboxes.shape[1] == 4
+        print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+        print(bboxes.shape[1])
+        assert bboxes.shape[1] == NUM_FIELDS_SBOX
         self.bboxes = bboxes
         self.format = format
         # self.normalized = normalized

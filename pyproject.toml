@@ -12,17 +12,23 @@
 
 # Installation:
 # The Ultralytics library can be installed using the command: 'pip install ultralytics'
-# For development purposes, you can install the package in editable mode with: 'pip install -e .'
+# For development purposes, you can install the package in editable mode with: 'pip install --force -e .'
 # then
-# pip install .[dev] .[extra]
-# pip install .[export]
-# pip install .[explorer]
-# pip install .[logging]
+# pip install --force .[dev]
+# pip install --force .[extra]
+# pip install --force .[export]
+# pip install --force .[explorer]
+# pip install --force .[logging]
 #
 # This approach allows for real-time code modifications without the need for re-installation.
 
 # Documentation:
 # For comprehensive documentation and usage instructions, visit: https://docs.ultralytics.com
+[tool.poetry]
+name = "ultralytics"
+version = "0.1.0"
+description = "YOLOv8 modified for predicting a 5 regressor."
+authors = ["David MacNaughton"]
 
 [build-system]
 requires = ["setuptools>=57.0.0", "wheel"]

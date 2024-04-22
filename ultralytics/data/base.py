@@ -249,7 +249,13 @@ class BaseDataset(Dataset):
 
     def __getitem__(self, index):
         """Returns transformed label information for given index."""
-        return self.transforms(self.get_image_and_label(index))
+        try:
+            return self.transforms(self.get_image_and_label(index))
+        except Exception as ex:
+            msg = f"Failed to transform image at index: {index}"
+            msg += "\n".join(self.im_files)
+            msg += f"\n{str(ex)}"
+            raise Exception(msg)
 
     def get_image_and_label(self, index):
         """Get and return label information from the dataset."""

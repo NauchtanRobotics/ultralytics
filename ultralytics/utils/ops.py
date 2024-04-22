@@ -399,6 +399,8 @@ def xyxy2xywh(x):
     y[..., 1] = (x[..., 1] + x[..., 3]) / 2  # y center
     y[..., 2] = x[..., 2] - x[..., 0]  # width
     y[..., 3] = x[..., 3] - x[..., 1]  # height
+    if x.shape[-1] == 5:
+        y[..., 4] = x[..., 4]
     return y
 
 
@@ -422,6 +424,8 @@ def xywh2xyxy(x):
     y[..., 1] = x[..., 1] - dh  # top left y
     y[..., 2] = x[..., 0] + dw  # bottom right x
     y[..., 3] = x[..., 1] + dh  # bottom right y
+    if x.shape[-1] == 5:
+        y[..., 4] = x[..., 4]
     return y
 
 
@@ -446,6 +450,8 @@ def xywhn2xyxy(x, w=640, h=640, padw=0, padh=0):
     y[..., 1] = h * (x[..., 1] - x[..., 3] / 2) + padh  # top left y
     y[..., 2] = w * (x[..., 0] + x[..., 2] / 2) + padw  # bottom right x
     y[..., 3] = h * (x[..., 1] + x[..., 3] / 2) + padh  # bottom right y
+    if x.shape[-1] == 5:
+        y[..., 4] = x[..., 4]
     return y
 
 
@@ -473,6 +479,8 @@ def xyxy2xywhn(x, w=640, h=640, clip=False, eps=0.0):
     y[..., 1] = ((x[..., 1] + x[..., 3]) / 2) / h  # y center
     y[..., 2] = (x[..., 2] - x[..., 0]) / w  # width
     y[..., 3] = (x[..., 3] - x[..., 1]) / h  # height
+    if x.shape[-1] == 5:
+        y[..., 4] = x[..., 4]
     return y
 
 
@@ -489,6 +497,8 @@ def xywh2ltwh(x):
     y = x.clone() if isinstance(x, torch.Tensor) else np.copy(x)
     y[..., 0] = x[..., 0] - x[..., 2] / 2  # top left x
     y[..., 1] = x[..., 1] - x[..., 3] / 2  # top left y
+    if x.shape[-1] == 5:
+        y[..., 4] = x[..., 4]
     return y
 
 
@@ -505,6 +515,8 @@ def xyxy2ltwh(x):
     y = x.clone() if isinstance(x, torch.Tensor) else np.copy(x)
     y[..., 2] = x[..., 2] - x[..., 0]  # width
     y[..., 3] = x[..., 3] - x[..., 1]  # height
+    if x.shape[-1] == 5:
+        y[..., 4] = x[..., 4]
     return y
 
 
@@ -521,6 +533,8 @@ def ltwh2xywh(x):
     y = x.clone() if isinstance(x, torch.Tensor) else np.copy(x)
     y[..., 0] = x[..., 0] + x[..., 2] / 2  # center x
     y[..., 1] = x[..., 1] + x[..., 3] / 2  # center y
+    if x.shape[-1] == 5:
+        y[..., 4] = x[..., 4]
     return y
 
 
@@ -592,6 +606,8 @@ def ltwh2xyxy(x):
     y = x.clone() if isinstance(x, torch.Tensor) else np.copy(x)
     y[..., 2] = x[..., 2] + x[..., 0]  # width
     y[..., 3] = x[..., 3] + x[..., 1]  # height
+    if x.shape[-1] == 5:
+        y[..., 4] = x[..., 4]
     return y
 
 

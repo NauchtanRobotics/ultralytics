@@ -292,7 +292,7 @@ class DetectionModel(BaseModel):
 
         # Build strides
         m = self.model[-1]  # Detect()
-        if isinstance(m, Detect):  # includes all Detect subclasses like Segment, Pose, OBB, WorldDetect
+        if isinstance(m, Detect):  # includes all Detect subclasses like Segment, Pose, OBB, Sev, WorldDetect
             s = 256  # 2x min stride
             m.inplace = self.inplace
             forward = lambda x: self.forward(x)[0] if isinstance(m, (Segment, Pose, OBB, DetectSev)) else self.forward(x)

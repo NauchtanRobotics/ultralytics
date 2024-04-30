@@ -12,7 +12,7 @@ from PIL import Image
 
 from ultralytics.utils import LOGGER, colorstr
 from ultralytics.utils.checks import check_version
-from ultralytics.utils.instance import Instances
+from ultralytics.utils.instance import Instances, NUM_FIELDS_SBOX
 from ultralytics.utils.metrics import bbox_ioa
 from ultralytics.utils.ops import segment2box, xyxyxyxy2xywhr
 from ultralytics.utils.torch_utils import TORCHVISION_0_10, TORCHVISION_0_11, TORCHVISION_0_13
@@ -978,7 +978,7 @@ class Format:
             labels["masks"] = masks
         labels["img"] = self._format_img(img)
         labels["cls"] = torch.from_numpy(cls) if nl else torch.zeros(nl)
-        labels["bboxes"] = torch.from_numpy(instances.bboxes) if nl else torch.zeros((nl, 4))
+        labels["bboxes"] = torch.from_numpy(instances.bboxes) if nl else torch.zeros((nl, NUM_FIELDS_SBOX))
         if self.return_keypoint:
             labels["keypoints"] = torch.from_numpy(instances.keypoints)
             if self.normalize:
@@ -1098,19 +1098,19 @@ class RandomLoadText:
 
 
 def v8_transforms(dataset, imgsz, hyp, stretch=False):
-    """Convert images to a size suitable for YOLOv8 training."""
+    """Covert images to a size suitable for YOLOv8 training."""
     pre_transform = Compose(
         [
             Mosaic(dataset, imgsz=imgsz, p=hyp.mosaic),
             CopyPaste(p=hyp.copy_paste),
-            RandomPerspective(
-                degrees=hyp.degrees,
-                translate=hyp.translate,
-                scale=hyp.scale,
-                shear=hyp.shear,
-                perspective=hyp.perspective,
-                pre_transform=None if stretch else LetterBox(new_shape=(imgsz, imgsz)),
-            ),
+            # RandomPerspective(
+            #     degrees=hyp.degrees,
+            #     translate=hyp.translate,
+            #     scale=hyp.scale,
+            #     shear=hyp.shear,
+            #     perspective=hyp.perspective,
+            #     pre_transform=None if stretch else LetterBox(new_shape=(imgsz, imgsz)),
+            # ),
         ]
     )
     flip_idx = dataset.data.get("flip_idx", [])  # for keypoints augmentation

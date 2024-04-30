@@ -4,7 +4,8 @@ from pathlib import Path
 
 from ultralytics.engine.model import Model
 from ultralytics.models import yolo
-from ultralytics.nn.tasks import ClassificationModel, DetectionModel, OBBModel, PoseModel, SegmentationModel, WorldModel
+from ultralytics.nn.tasks import ClassificationModel, DetectionModel, OBBModel, PoseModel, SegmentationModel, \
+    WorldModel, SevModel
 from ultralytics.utils import ROOT, yaml_load
 
 
@@ -56,6 +57,12 @@ class YOLO(Model):
                 "validator": yolo.obb.OBBValidator,
                 "predictor": yolo.obb.OBBPredictor,
             },
+            "sev": {
+                "model": SevModel,
+                "trainer": yolo.sev.SevTrainer,
+                "validator": yolo.sev.SevValidator,
+                "predictor": yolo.sev.SevPredictor,
+            }
         }
 
 

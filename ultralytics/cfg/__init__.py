@@ -31,13 +31,14 @@ from ultralytics.utils import (
 
 # Define valid tasks and modes
 MODES = {"train", "val", "predict", "export", "track", "benchmark"}
-TASKS = {"detect", "segment", "classify", "pose", "obb"}
+TASKS = {"detect", "segment", "classify", "pose", "obb", "sev"}
 TASK2DATA = {
     "detect": "coco8.yaml",
     "segment": "coco8-seg.yaml",
     "classify": "imagenet10",
     "pose": "coco8-pose.yaml",
     "obb": "dota8.yaml",
+    "sev": "coco8.yaml"
 }
 TASK2MODEL = {
     "detect": "yolov8n.pt",
@@ -45,6 +46,7 @@ TASK2MODEL = {
     "classify": "yolov8n-cls.pt",
     "pose": "yolov8n-pose.pt",
     "obb": "yolov8n-obb.pt",
+    "sev": "yolov8n-sev.pt",
 }
 TASK2METRIC = {
     "detect": "metrics/mAP50-95(B)",
@@ -52,6 +54,7 @@ TASK2METRIC = {
     "classify": "metrics/accuracy_top1",
     "pose": "metrics/mAP50-95(P)",
     "obb": "metrics/mAP50-95(B)",
+    "sev": "metrics/mAP50-95(B)",
 }
 
 ARGV = sys.argv or ["", ""]  # sometimes sys.argv = []
@@ -444,7 +447,7 @@ def entrypoint(debug=""):
 
     This function allows for:
     - passing mandatory YOLO args as a list of strings
-    - specifying the task to be performed, either 'detect', 'segment' or 'classify'
+    - specifying the task to be performed, either 'detect', 'sev','segment' or 'classify'
     - specifying the mode, either 'train', 'val', 'test', or 'predict'
     - running special modes like 'checks'
     - passing overrides to the package's configuration

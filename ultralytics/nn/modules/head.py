@@ -14,7 +14,7 @@ from .conv import Conv
 from .transformer import MLP, DeformableTransformerDecoder, DeformableTransformerDecoderLayer
 from .utils import bias_init_with_prob, linear_init
 
-__all__ = "Detect", "Segment", "Pose", "Classify", "OBB", "RTDETRDecoder"
+__all__ = "Detect", "DetectSev", "Segment", "Pose", "Classify", "OBB", "RTDETRDecoder"
 
 
 class Detect(nn.Module):
@@ -71,7 +71,10 @@ class Detect(nn.Module):
             norm = self.strides / (self.stride[0] * grid_size)
             dbox = self.decode_bboxes(self.dfl(box) * norm, self.anchors.unsqueeze(0) * norm[:, :2])
         else:
-            dbox = self.decode_bboxes(self.dfl(box), self.anchors.unsqueeze(0)) * self.strides
+            dfl_box = self.dfl(box)
+            anchors_unsqueezed = self.anchors.unsqueeze(0)
+            dbox_rel = self.decode_bboxes(dfl_box, anchors_unsqueezed)
+            dbox = dbox_rel * self.strides
 
         y = torch.cat((dbox, cls.sigmoid()), 1)
         return y if self.export else (y, x)
@@ -145,6 +148,36 @@ class OBB(Detect):
     def decode_bboxes(self, bboxes, anchors):
         """Decode rotated bounding boxes."""
         return dist2rbox(bboxes, self.angle, anchors, dim=1)
+
+
+class DetectSev(Detect):
+    """YOLOv8 Sev detection head for detection with rotation models."""
+
+    def __init__(self, nc=80, ne=1, ch=()):
+        """Initialize DetectSev with number of classes `nc` and layer channels `ch`."""
+        super().__init__(nc, ch)
+        self.ne = ne  # number of extra parameters
+        self.detect = Detect.forward
+
+        c4 = max(ch[0] // 4, self.ne)
+        self.cv4 = nn.ModuleList(nn.Sequential(Conv(x, c4, 3), Conv(c4, c4, 3), nn.Conv2d(c4, self.ne, 1)) for x in ch)
+
+    def forward(self, x):
+        """Concatenates and returns predicted bounding boxes and class probabilities."""
+        bs = x[0].shape[0]  # batch size
+        list_severity_pages = [self.cv4[i](x[i]).view(bs, self.ne, -1) for i in range(self.nl)]
+        severity = torch.cat(list_severity_pages, 2)  # theta logits
+        # No need to set `severity` as an attribute so that `decode_bboxes` can use it.
+        if not self.training:
+            self.severity = severity
+        x = self.detect(self, x)
+        if self.training:
+            return x, severity
+        return torch.cat([x, severity], 1) if self.export else (torch.cat([x[0], severity], 1), (x[1], severity))
+
+    def decode_bboxes(self, bboxes, anchors):
+        """Decode bounding boxes that have severity appended."""
+        return dist2bbox(bboxes, anchors, dim=1)
 
 
 class Pose(Detect):

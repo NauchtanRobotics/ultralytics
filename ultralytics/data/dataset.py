@@ -108,7 +108,7 @@ class YOLODataset(BaseDataset):
                             "im_file": im_file,
                             "shape": shape,
                             "cls": lb[:, 0:1],  # n, 1
-                            "bboxes": lb[:, 1:],  # n, 4
+                            "bboxes": lb[:, 1:],  # n, 4 (or 5 in case of severity modelling).
                             "segments": segments,
                             "keypoints": keypoint,
                             "normalized": True,
@@ -140,7 +140,7 @@ class YOLODataset(BaseDataset):
             assert cache["hash"] == get_hash(self.label_files + self.im_files)  # identical hash
         except (FileNotFoundError, AssertionError, AttributeError):
             cache, exists = self.cache_labels(cache_path), False  # run cache ops
-
+        # cache, exists = self.cache_labels(cache_path), False
         # Display cache
         nf, nm, ne, nc, n = cache.pop("results")  # found, missing, empty, corrupt, total
         if exists and LOCAL_RANK in {-1, 0}:
@@ -236,7 +236,7 @@ class YOLODataset(BaseDataset):
             value = values[i]
             if k == "img":
                 value = torch.stack(value, 0)
-            if k in {"masks", "keypoints", "bboxes", "cls", "segments", "obb"}:
+            if k in {"masks", "keypoints", "bboxes", "cls", "segments", "obb", "sev"}:
                 value = torch.cat(value, 0)
             new_batch[k] = value
         new_batch["batch_idx"] = list(new_batch["batch_idx"])

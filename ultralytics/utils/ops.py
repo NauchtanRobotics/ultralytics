@@ -177,6 +177,8 @@ def non_max_suppression(
 ):
     """
     Perform non-maximum suppression (NMS) on a set of boxes, with support for masks and multiple labels per box.
+    Works for extra continuous predictors like rotation angle, severity as these extra data is appended independent
+    of NMS processing, same as masks.
 
     Args:
         prediction (torch.Tensor): A tensor of shape (batch_size, num_classes + 4 + num_masks, num_boxes)
@@ -199,7 +201,7 @@ def non_max_suppression(
         max_nms (int): The maximum number of boxes into torchvision.ops.nms().
         max_wh (int): The maximum box width and height in pixels.
         in_place (bool): If True, the input prediction tensor will be modified in place.
-
+        rotated: Set to true for object-oriented (rotated) bounding boxes (OBB)
     Returns:
         (List[torch.Tensor]): A list of length batch_size, where each element is a tensor of
             shape (num_boxes, 6 + num_masks) containing the kept boxes, with columns
@@ -215,7 +217,7 @@ def non_max_suppression(
 
     bs = prediction.shape[0]  # batch size
     nc = nc or (prediction.shape[1] - 4)  # number of classes
-    nm = prediction.shape[1] - nc - 4
+    nm = prediction.shape[1] - nc - 4  # remaining prediction field such as rotation alpha, severity or masks.
     mi = 4 + nc  # mask start index
     xc = prediction[:, 4:mi].amax(1) > conf_thres  # candidates
 
@@ -251,7 +253,7 @@ def non_max_suppression(
             continue
 
         # Detections matrix nx6 (xyxy, conf, cls)
-        box, cls, mask = x.split((4, nc, nm), 1)
+        box, cls, mask = x.split((4, nc, nm), 1)  # 'mask' encompasses all predictors surplus to bboxes, e.g. OBB angle
 
         if multi_label:
             i, j = torch.where(cls > conf_thres)
@@ -390,12 +392,15 @@ def xyxy2xywh(x):
     Returns:
         y (np.ndarray | torch.Tensor): The bounding box coordinates in (x, y, width, height) format.
     """
-    assert x.shape[-1] == 4, f"input shape last dimension expected 4 but input shape is {x.shape}"
+    from ultralytics.utils.instance import NUM_FIELDS_SBOX
+    assert x.shape[-1] == NUM_FIELDS_SBOX, f"input shape last dimension expected {NUM_FIELDS_SBOX} but input shape is {x.shape}"
     y = torch.empty_like(x) if isinstance(x, torch.Tensor) else np.empty_like(x)  # faster than clone/copy
     y[..., 0] = (x[..., 0] + x[..., 2]) / 2  # x center
     y[..., 1] = (x[..., 1] + x[..., 3]) / 2  # y center
     y[..., 2] = x[..., 2] - x[..., 0]  # width
     y[..., 3] = x[..., 3] - x[..., 1]  # height
+    if x.shape[-1] == 5:
+        y[..., 4] = x[..., 4]
     return y
 
 
@@ -410,7 +415,8 @@ def xywh2xyxy(x):
     Returns:
         y (np.ndarray | torch.Tensor): The bounding box coordinates in (x1, y1, x2, y2) format.
     """
-    assert x.shape[-1] == 4, f"input shape last dimension expected 4 but input shape is {x.shape}"
+    from ultralytics.utils.instance import NUM_FIELDS_SBOX
+    assert x.shape[-1] == NUM_FIELDS_SBOX, f"input shape last dimension expected {NUM_FIELDS_SBOX} but input shape is {x.shape}"
     y = torch.empty_like(x) if isinstance(x, torch.Tensor) else np.empty_like(x)  # faster than clone/copy
     dw = x[..., 2] / 2  # half-width
     dh = x[..., 3] / 2  # half-height
@@ -418,6 +424,8 @@ def xywh2xyxy(x):
     y[..., 1] = x[..., 1] - dh  # top left y
     y[..., 2] = x[..., 0] + dw  # bottom right x
     y[..., 3] = x[..., 1] + dh  # bottom right y
+    if x.shape[-1] == 5:
+        y[..., 4] = x[..., 4]
     return y
 
 
@@ -435,12 +443,15 @@ def xywhn2xyxy(x, w=640, h=640, padw=0, padh=0):
         y (np.ndarray | torch.Tensor): The coordinates of the bounding box in the format [x1, y1, x2, y2] where
             x1,y1 is the top-left corner, x2,y2 is the bottom-right corner of the bounding box.
     """
-    assert x.shape[-1] == 4, f"input shape last dimension expected 4 but input shape is {x.shape}"
+    from ultralytics.utils.instance import NUM_FIELDS_SBOX
+    assert x.shape[-1] == NUM_FIELDS_SBOX, f"input shape last dimension expected {NUM_FIELDS_SBOX} but input shape is {x.shape}"
     y = torch.empty_like(x) if isinstance(x, torch.Tensor) else np.empty_like(x)  # faster than clone/copy
     y[..., 0] = w * (x[..., 0] - x[..., 2] / 2) + padw  # top left x
     y[..., 1] = h * (x[..., 1] - x[..., 3] / 2) + padh  # top left y
     y[..., 2] = w * (x[..., 0] + x[..., 2] / 2) + padw  # bottom right x
     y[..., 3] = h * (x[..., 1] + x[..., 3] / 2) + padh  # bottom right y
+    if x.shape[-1] == 5:
+        y[..., 4] = x[..., 4]
     return y
 
 
@@ -461,12 +472,15 @@ def xyxy2xywhn(x, w=640, h=640, clip=False, eps=0.0):
     """
     if clip:
         x = clip_boxes(x, (h - eps, w - eps))
-    assert x.shape[-1] == 4, f"input shape last dimension expected 4 but input shape is {x.shape}"
+    from ultralytics.utils.instance import NUM_FIELDS_SBOX
+    assert x.shape[-1] == NUM_FIELDS_SBOX, f"input shape last dimension expected {NUM_FIELDS_SBOX} but input shape is {x.shape}"
     y = torch.empty_like(x) if isinstance(x, torch.Tensor) else np.empty_like(x)  # faster than clone/copy
     y[..., 0] = ((x[..., 0] + x[..., 2]) / 2) / w  # x center
     y[..., 1] = ((x[..., 1] + x[..., 3]) / 2) / h  # y center
     y[..., 2] = (x[..., 2] - x[..., 0]) / w  # width
     y[..., 3] = (x[..., 3] - x[..., 1]) / h  # height
+    if x.shape[-1] == 5:
+        y[..., 4] = x[..., 4]
     return y
 
 
@@ -483,6 +497,8 @@ def xywh2ltwh(x):
     y = x.clone() if isinstance(x, torch.Tensor) else np.copy(x)
     y[..., 0] = x[..., 0] - x[..., 2] / 2  # top left x
     y[..., 1] = x[..., 1] - x[..., 3] / 2  # top left y
+    if x.shape[-1] == 5:
+        y[..., 4] = x[..., 4]
     return y
 
 
@@ -499,6 +515,8 @@ def xyxy2ltwh(x):
     y = x.clone() if isinstance(x, torch.Tensor) else np.copy(x)
     y[..., 2] = x[..., 2] - x[..., 0]  # width
     y[..., 3] = x[..., 3] - x[..., 1]  # height
+    if x.shape[-1] == 5:
+        y[..., 4] = x[..., 4]
     return y
 
 
@@ -515,6 +533,8 @@ def ltwh2xywh(x):
     y = x.clone() if isinstance(x, torch.Tensor) else np.copy(x)
     y[..., 0] = x[..., 0] + x[..., 2] / 2  # center x
     y[..., 1] = x[..., 1] + x[..., 3] / 2  # center y
+    if x.shape[-1] == 5:
+        y[..., 4] = x[..., 4]
     return y
 
 
@@ -586,6 +606,8 @@ def ltwh2xyxy(x):
     y = x.clone() if isinstance(x, torch.Tensor) else np.copy(x)
     y[..., 2] = x[..., 2] + x[..., 0]  # width
     y[..., 3] = x[..., 3] + x[..., 1]  # height
+    if x.shape[-1] == 5:
+        y[..., 4] = x[..., 4]
     return y
 
 

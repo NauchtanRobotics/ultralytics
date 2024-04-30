@@ -32,6 +32,7 @@ from ultralytics.utils import (
     yaml_save,
 )
 from ultralytics.utils.checks import check_file, check_font, is_ascii
+from ultralytics.utils.instance import NUM_FIELDS_SBOX
 from ultralytics.utils.downloads import download, safe_download, unzip_file
 from ultralytics.utils.ops import segments2boxes
 
@@ -40,6 +41,8 @@ IMG_FORMATS = {"bmp", "dng", "jpeg", "jpg", "mpo", "png", "tif", "tiff", "webp",
 VID_FORMATS = {"asf", "avi", "gif", "m4v", "mkv", "mov", "mp4", "mpeg", "mpg", "ts", "wmv", "webm"}  # video suffixes
 PIN_MEMORY = str(os.getenv("PIN_MEMORY", True)).lower() == "true"  # global pin_memory for dataloaders
 FORMATS_HELP_MSG = f"Supported formats are:\nimages: {IMG_FORMATS}\nvideos: {VID_FORMATS}"
+
+NUM_FIELDS_SBOX_LABELS = NUM_FIELDS_SBOX + 1  # (cls, xywh, severity)
 
 
 def img2label_paths(img_paths):
@@ -90,12 +93,16 @@ def verify_image(args):
         nf = 1
     except Exception as e:
         nc = 1
-        msg = f"{prefix}WARNING ⚠️ {im_file}: ignoring corrupt image/label: {e}"
+        msg = f"{prefix}WARNING ⚠️ {im_file}: ignoring corrupted image/label: {e}"
     return (im_file, cls), nf, nc, msg
 
 
 def verify_image_label(args):
-    """Verify one image-label pair."""
+    """Verify one image-label pair and return image, annotations data and warning messages.
+
+    Returns:
+        im_file, lb, shape, segments, keypoints, nm, nf, ne, nc, msg
+    """
     im_file, lb_file, prefix, keypoint, num_cls, nkpt, ndim = args
     # Number (missing, found, empty, corrupt), message, segments, keypoints
     nm, nf, ne, nc, msg, segments, keypoints = 0, 0, 0, 0, "", [], None
@@ -119,7 +126,7 @@ def verify_image_label(args):
             nf = 1  # label found
             with open(lb_file) as f:
                 lb = [x.split() for x in f.read().strip().splitlines() if len(x)]
-                if any(len(x) > 6 for x in lb) and (not keypoint):  # is segment
+                if any(len(x) > NUM_FIELDS_SBOX_LABELS + 1 for x in lb) and (not keypoint):  # is segment
                     classes = np.array([x[0] for x in lb], dtype=np.float32)
                     segments = [np.array(x[1:], dtype=np.float32).reshape(-1, 2) for x in lb]  # (cls, xy1...)
                     lb = np.concatenate((classes.reshape(-1, 1), segments2boxes(segments)), 1)  # (cls, xywh)
@@ -127,11 +134,11 @@ def verify_image_label(args):
             nl = len(lb)
             if nl:
                 if keypoint:
-                    assert lb.shape[1] == (5 + nkpt * ndim), f"labels require {(5 + nkpt * ndim)} columns each"
-                    points = lb[:, 5:].reshape(-1, ndim)[:, :2]
+                    assert lb.shape[1] == (NUM_FIELDS_SBOX_LABELS + nkpt * ndim), f"labels require {(NUM_FIELDS_SBOX_LABELS + nkpt * ndim)} columns each"
+                    points = lb[:, NUM_FIELDS_SBOX_LABELS:].reshape(-1, ndim)[:, :2]
                 else:
-                    assert lb.shape[1] == 5, f"labels require 5 columns, {lb.shape[1]} columns detected"
-                    points = lb[:, 1:]
+                    assert lb.shape[1] == NUM_FIELDS_SBOX_LABELS, f"labels require {NUM_FIELDS_SBOX_LABELS} columns, {lb.shape[1]} columns detected"
+                    points = lb[:, 1:NUM_FIELDS_SBOX_LABELS - 1]
                 assert points.max() <= 1, f"non-normalized or out of bounds coordinates {points[points > 1]}"
                 assert lb.min() >= 0, f"negative label values {lb[lb < 0]}"
 
@@ -149,20 +156,20 @@ def verify_image_label(args):
                     msg = f"{prefix}WARNING ⚠️ {im_file}: {nl - len(i)} duplicate labels removed"
             else:
                 ne = 1  # label empty
-                lb = np.zeros((0, (5 + nkpt * ndim) if keypoint else 5), dtype=np.float32)
+                lb = np.zeros((0, (NUM_FIELDS_SBOX_LABELS + nkpt * ndim) if keypoint else NUM_FIELDS_SBOX_LABELS), dtype=np.float32)
         else:
             nm = 1  # label missing
-            lb = np.zeros((0, (5 + nkpt * ndim) if keypoints else 5), dtype=np.float32)
+            lb = np.zeros((0, (NUM_FIELDS_SBOX_LABELS + nkpt * ndim) if keypoints else NUM_FIELDS_SBOX_LABELS), dtype=np.float32)
         if keypoint:
-            keypoints = lb[:, 5:].reshape(-1, nkpt, ndim)
+            keypoints = lb[:, NUM_FIELDS_SBOX_LABELS:].reshape(-1, nkpt, ndim)
             if ndim == 2:
                 kpt_mask = np.where((keypoints[..., 0] < 0) | (keypoints[..., 1] < 0), 0.0, 1.0).astype(np.float32)
                 keypoints = np.concatenate([keypoints, kpt_mask[..., None]], axis=-1)  # (nl, nkpt, 3)
-        lb = lb[:, :5]
+        lb = lb[:, :NUM_FIELDS_SBOX_LABELS]  # lb[:, :5] won't work for severity dataset
         return im_file, lb, shape, segments, keypoints, nm, nf, ne, nc, msg
     except Exception as e:
         nc = 1
-        msg = f"{prefix}WARNING ⚠️ {im_file}: ignoring corrupt image/label: {e}"
+        msg = f"{prefix}WARNING ⚠️ {im_file}: ignoring corrupting image/label: {e}"
         return [None, None, None, None, None, nm, nf, ne, nc, msg]
 
 

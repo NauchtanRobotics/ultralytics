@@ -662,3 +662,27 @@ def test_yolo_world():
         name="yolo-world",
         trainer=WorldTrainerFromScratch,
     )
+
+
+def test_sev_validator():
+    weights = Path("/home/david/production/sealed_roads_dataset/.train/srd42.2106/weights/last.pt")
+    model = YOLO(weights)  # , task="sev")
+
+    # trainer = SevTrainer(overrides=args)
+    # validator = trainer.get_validator()  # but this hasn't had self.test_loader established.
+    data_yaml = Path("/home/david/production/severity42.2/dataset.yaml")
+    # TODO: problem in ultralytics.data.augment.RandomPerspective.apply_bboxes assumes 4 points not 5. How
+    #       do we avoid augmenting the severity field but still have it included?
+    results = model.val(
+        data=data_yaml,
+        imgsz=800,
+        device="1",  # "0,1",
+        conf=0.05,
+        workers=6,
+        name="srd42.2",
+        batch=40,
+        project=Path("/home/david/production/sealed_roads_dataset/.val")  # or could put it in "runs/severity/train"
+    )
+
+
+

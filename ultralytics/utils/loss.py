@@ -752,14 +752,14 @@ class v8SevLoss(v8DetectionLoss):
 
     def __call__(self, preds, batch):  # batch is ground truth data for batch
         """Calculate and return the loss for the YOLO model."""
-        loss = torch.zeros(4, device=self.device)  # box, cls, dfl, sev ~ where to include severity loss?
-        feats, pred_severity = preds if isinstance(preds[0], list) else preds[1]
+        loss = torch.zeros(4, device=self.device)  # box, cls, dfl, sev_loss
+        pred_feats, pred_severity = preds if isinstance(preds[0], list) else preds[1]
 
         batch_size = pred_severity.shape[0]  # batch size, number of masks, mask height, mask width
-        list_feat_parts = [xi.view(feats[0].shape[0], self.no, -1) for xi in feats]
+        list_feat_parts = [xi.view(pred_feats[0].shape[0], self.no, -1) for xi in pred_feats]
         cat_feats = torch.cat(list_feat_parts, 2)
         pred_distri, pred_scores = cat_feats.split(
-            (self.reg_max * 4, self.nc), 1  # was (self.reg_max * NUM_FIELDS_SBOX, self.nc), 1
+            (self.reg_max * 4, self.nc), 1
         )
 
         # b, grids, ..
@@ -768,8 +768,8 @@ class v8SevLoss(v8DetectionLoss):
         pred_severity = pred_severity.permute(0, 2, 1).contiguous()
 
         dtype = pred_scores.dtype
-        imgsz = torch.tensor(feats[0].shape[2:], device=self.device, dtype=dtype) * self.stride[0]  # image size (h,w)
-        anchor_points, stride_tensor = make_anchors(feats, self.stride, 0.5)
+        imgsz = torch.tensor(pred_feats[0].shape[2:], device=self.device, dtype=dtype) * self.stride[0]  # image size (h,w)
+        anchor_points, stride_tensor = make_anchors(pred_feats, self.stride, 0.5)
 
         # targets
         try:

@@ -218,14 +218,21 @@ def non_max_suppression(
     bs = prediction.shape[0]  # batch size
     nc = nc or (prediction.shape[1] - 4)  # number of classes
     nm = prediction.shape[1] - nc - 4  # remaining prediction field such as rotation alpha, severity or masks.
-    mi = 4 + nc  # mask start index
+    mi = 4 + nc  # mask start index - DOES SEVERITY REALLY COME LAST? Check how data is ordered in prediction
     xc = prediction[:, 4:mi].amax(1) > conf_thres  # candidates
+    count_likely = torch.count_nonzero(xc).item()
+    # severity = prediction[:, mi]  # looks right with predictions around 3.2
 
     # Settings
     # min_wh = 2  # (pixels) minimum box width and height
     time_limit = 2.0 + max_time_img * bs  # seconds to quit after
     multi_label &= nc > 1  # multiple labels per box (adds 0.5ms/img)
 
+    output = [torch.zeros((0, 6 + nm), device=prediction.device)] * bs
+    if count_likely == 0:
+        return output  # exit early
+    # TODO: remove the nex debugging line:
+    print("Finally, a non-zero confidence!")
     prediction = prediction.transpose(-1, -2)  # shape(1,84,6300) to shape(1,6300,84)
     if not rotated:
         if in_place:
@@ -234,7 +241,6 @@ def non_max_suppression(
             prediction = torch.cat((xywh2xyxy(prediction[..., :4]), prediction[..., 4:]), dim=-1)  # xywh to xyxy
 
     t = time.time()
-    output = [torch.zeros((0, 6 + nm), device=prediction.device)] * bs
     for xi, x in enumerate(prediction):  # image index, image inference
         # Apply constraints
         # x[((x[:, 2:4] < min_wh) | (x[:, 2:4] > max_wh)).any(1), 4] = 0  # width-height

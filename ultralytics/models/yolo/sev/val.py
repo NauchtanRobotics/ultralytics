@@ -48,7 +48,7 @@ class SevValidator(DetectionValidator):
             multi_label=True,
             agnostic=self.args.single_cls,
             max_det=self.args.max_det,
-            rotated=True,
+            rotated=False,
         )
 
     def _process_batch(self, detections, gt_bboxes, gt_cls):

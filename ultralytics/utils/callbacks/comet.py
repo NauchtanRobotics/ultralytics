@@ -118,11 +118,11 @@ def _scale_bounding_box_to_original_image_shape(box, resized_image_shape, origin
     resized_image_height, resized_image_width = resized_image_shape
 
     # Convert normalized xywh format predictions to xyxy in resized scale format
-    box = ops.xywhn2xyxy(box, h=resized_image_height, w=resized_image_width)
+    box[..., :4] = ops.xywhn2xyxy(box[..., :4], h=resized_image_height, w=resized_image_width)
     # Scale box predictions from resized image scale back to original image scale
-    box = ops.scale_boxes(resized_image_shape, box, original_image_shape, ratio_pad)
+    box[..., :4] = ops.scale_boxes(resized_image_shape, box[..., :4], original_image_shape, ratio_pad)
     # Convert bounding box format from xyxy to xywh for Comet logging
-    box = ops.xyxy2xywh(box)
+    box[..., :4] = ops.xyxy2xywh(box[..., :4])
     # Adjust xy center to correspond top-left corner
     box[:2] -= box[2:] / 2
     box = box.tolist()

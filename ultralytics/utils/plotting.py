@@ -706,7 +706,7 @@ def plot_labels(boxes, cls, names=(), save_dir=Path(""), on_plot=None):
 
     # Rectangles
     boxes[:, 0:2] = 0.5  # center
-    boxes = ops.xywh2xyxy(boxes) * 1000
+    boxes[..., :4] = ops.xywh2xyxy(boxes[..., :4]) * 1000
     img = Image.fromarray(np.ones((1000, 1000, 3), dtype=np.uint8) * 255)
     for cls, box in zip(cls[:500], boxes[:500]):
         ImageDraw.Draw(img).rectangle(box, width=1, outline=colors(cls))  # plot
@@ -761,8 +761,8 @@ def save_one_box(xyxy, im, file=Path("im.jpg"), gain=1.02, pad=10, square=False,
     if square:
         b[:, 2:] = b[:, 2:].max(1)[0].unsqueeze(1)  # attempt rectangle to square
     b[:, 2:] = b[:, 2:] * gain + pad  # box wh * gain + pad
-    xyxy = ops.xywh2xyxy(b).long()
-    xyxy = ops.clip_boxes(xyxy, im.shape)
+    xyxy[..., :4] = ops.xywh2xyxy(b[..., :4]).long()
+    xyxy[..., :4] = ops.clip_boxes(xyxy[..., :4], im.shape)
     crop = im[int(xyxy[0, 1]) : int(xyxy[0, 3]), int(xyxy[0, 0]) : int(xyxy[0, 2]), :: (1 if BGR else -1)]
     if save:
         file.parent.mkdir(parents=True, exist_ok=True)  # make directory

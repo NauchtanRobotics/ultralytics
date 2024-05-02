@@ -104,7 +104,9 @@ class SevValidator(DetectionValidator):
         imgsz = batch["img"].shape[2:]
         ratio_pad = batch["ratio_pad"][si]
         if len(cls):
-            bbox[..., :4].mul_(torch.tensor(imgsz, device=self.device)[[1, 0, 1, 0]])  # target boxes - SCALES IT RIGHT?
+            bbox[..., :4] = ops.xywh2xyxy(bbox[..., :4]) * torch.tensor(imgsz, device=self.device)[[1, 0, 1, 0]]  # target boxes
+            # may use less memory:
+            # bbox[..., :4].mul_(torch.tensor(imgsz, device=self.device)[[1, 0, 1, 0]])  # target boxes - SCALES IT RIGHT?
             ops.scale_boxes(imgsz, bbox, ori_shape, ratio_pad=ratio_pad, xywh=True)  # native-space labels  - CAN WE REMOVE THIS IF WE DON'T WANT PADDING?
         return {"cls": cls, "bbox": bbox, "ori_shape": ori_shape, "imgsz": imgsz, "ratio_pad": ratio_pad}
 

@@ -69,7 +69,8 @@ class Bboxes:
             func = xywh2xyxy if format == "xyxy" else xywh2ltwh
         else:
             func = ltwh2xyxy if format == "xyxy" else ltwh2xywh
-        self.bboxes = func(self.bboxes)
+        # was: self.bboxes = func(self.bboxes)
+        self.bboxes[..., :4] = func(self.bboxes[..., :4])
         self.format = format
 
     def areas(self):

@@ -352,7 +352,7 @@ class DetectionModel(BaseModel):
 class SevModel(DetectionModel):
     """YOLOv8 Severity ('sev') model."""
 
-    def __init__(self, cfg="yolov8n-sev.yaml", ch=3, nc=None, verbose=True):
+    def __init__(self, cfg="yolov8s-sev.yaml", ch=3, nc=None, verbose=True):
         """Initialize YOLOv8 SEV model with given config and parameters."""
         super().__init__(cfg=cfg, ch=ch, nc=nc, verbose=verbose)
 

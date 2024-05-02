@@ -6,7 +6,7 @@ import torch
 
 from ultralytics.models.yolo.detect import DetectionValidator
 from ultralytics.utils import LOGGER, ops
-from ultralytics.utils.metrics import OBBMetrics, batch_probiou  # do we need SevMetrics
+from ultralytics.utils.metrics import box_iou, SevMetrics
 from ultralytics.utils.plotting import output_to_rotated_target, plot_images
 
 
@@ -28,7 +28,7 @@ class SevValidator(DetectionValidator):
         """Initialize OBBValidator and set task to 'sev', metrics can use OBBMetrics."""
         super().__init__(dataloader, save_dir, pbar, args, _callbacks)
         self.args.task = "sev"
-        self.metrics = OBBMetrics(save_dir=self.save_dir, plot=True, on_plot=self.on_plot)
+        self.metrics = SevMetrics(save_dir=self.save_dir, plot=True, on_plot=self.on_plot)
 
     def init_metrics(self, model):
         """Initialize evaluation metrics for YOLO."""

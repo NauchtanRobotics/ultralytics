@@ -228,17 +228,16 @@ def non_max_suppression(
     time_limit = 2.0 + max_time_img * bs  # seconds to quit after
     multi_label &= nc > 1  # multiple labels per box (adds 0.5ms/img)
 
-    output = [torch.zeros((0, 6 + nm), device=prediction.device)] * bs
-    if count_likely == 0:
-        return output  # exit early
-    # TODO: remove the nex debugging line:
-    print("Finally, a non-zero confidence!")
     prediction = prediction.transpose(-1, -2)  # shape(1,84,6300) to shape(1,6300,84)
     if not rotated:
         if in_place:
             prediction[..., :4] = xywh2xyxy(prediction[..., :4])  # xywh to xyxy
         else:
             prediction = torch.cat((xywh2xyxy(prediction[..., :4]), prediction[..., 4:]), dim=-1)  # xywh to xyxy
+
+    output = [torch.zeros((0, 6 + nm), device=prediction.device)] * bs
+    if count_likely == 0:  # TODO: Consider removing this to ensure side effects
+        return output  # exit early
 
     t = time.time()
     for xi, x in enumerate(prediction):  # image index, image inference

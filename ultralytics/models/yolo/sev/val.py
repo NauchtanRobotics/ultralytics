@@ -37,6 +37,31 @@ class SevValidator(DetectionValidator):
         val = self.data.get(self.args.split, "")  # validation path
         self.is_dota = isinstance(val, str) and "DOTA" in val  # is COCO
 
+    def preprocess(self, batch):
+        """ Normalises images [0,1] and moves images, class_id and bboxes data to device (e.g. GPU) i """
+        batch["img"] = batch["img"].to(self.device, non_blocking=True)
+        batch["img"] = (batch["img"].half() if self.args.half else batch["img"].float()) / 255
+        for k in ["batch_idx", "cls", "bboxes"]:
+            batch[k] = batch[k].to(self.device)
+
+        if self.args.save_hybrid:
+            height, width = batch["img"].shape[2:]
+            nb = len(batch["img"])
+            # bboxes = batch["bboxes"] * torch.tensor((width, height, width, height), device=self.device)  # original
+            scale_tensor = torch.tensor((width, height, width, height), device=self.device)
+            bboxes = batch["bboxes"][:, :4] * scale_tensor     # UNTESTED - not using HYBRID atm.
+            bboxes = torch.cat([bboxes, batch["bboxes"][:, 4]], dim=-1)
+            self.lb = (
+                [
+                    torch.cat([batch["cls"][batch["batch_idx"] == i], bboxes[batch["batch_idx"] == i]], dim=-1)
+                    for i in range(nb)
+                ]
+                if self.args.save_hybrid
+                else []
+            )  # for autolabelling
+
+        return batch
+
     def postprocess(self, preds):
         """Apply Non-maximum suppression to prediction outputs."""
         return ops.non_max_suppression(

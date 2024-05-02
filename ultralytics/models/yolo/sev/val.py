@@ -5,6 +5,7 @@ from pathlib import Path
 import torch
 
 from ultralytics.models.yolo.detect import DetectionValidator
+from ultralytics.models.yolo.detect.val import IDX_CLASS
 from ultralytics.utils import LOGGER, ops
 from ultralytics.utils.metrics import box_iou, SevMetrics
 from ultralytics.utils.plotting import output_to_rotated_target, plot_images
@@ -52,20 +53,22 @@ class SevValidator(DetectionValidator):
 
     def _process_batch(self, detections, gt_bboxes, gt_cls):
         """
-        Return correct prediction matrix.
+                Return correct prediction matrix.
 
-        Args:
-            detections (torch.Tensor): Tensor of shape [N, 7] representing detections.
-                Each detection is of the format: x1, y1, x2, y2, conf, class, angle.
-            gt_bboxes (torch.Tensor): Tensor of shape [M, 5] representing rotated boxes.
-                Each box is of the format: x1, y1, x2, y2, angle.
-            labels (torch.Tensor): Tensor of shape [M] representing labels.
+                Args:
+                    detections (torch.Tensor): Tensor of shape [N, 6] representing detections.
+                        Each detection is of the format: x1, y1, x2, y2, conf, class.
 
-        Returns:
-            (torch.Tensor): Correct prediction matrix of shape [N, 10] for 10 IoU levels.
-        """
-        iou = batch_probiou(gt_bboxes, torch.cat([detections[:, :4], detections[:, -1:]], dim=-1))
-        return self.match_predictions(detections[:, 5], gt_cls, iou)
+                Returns:
+                    (torch.Tensor): Correct prediction matrix of shape [N, 10] for 10 IoU levels.
+                """
+        iou = box_iou(gt_bboxes[:, :4], detections[:, :4])
+        return self.match_predictions(
+            pred_classes=detections[:, IDX_CLASS],
+            true_classes=gt_cls,
+            iou=iou,
+            use_scipy=False
+        )
 
     def _prepare_batch(self, si, batch):
         """Prepares and returns a batch for OBB validation."""

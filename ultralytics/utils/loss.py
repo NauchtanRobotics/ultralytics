@@ -717,7 +717,7 @@ class v8OBBLoss(v8DetectionLoss):
         return torch.cat((dist2rbox(pred_dist, pred_angle, anchor_points), pred_angle), dim=-1)
 
 
-HYP_SEV = 0.0001
+HYP_SEV = 0.1
 
 
 class v8SevLoss(v8DetectionLoss):
@@ -730,7 +730,7 @@ class v8SevLoss(v8DetectionLoss):
         super().__init__(model)
         self.assigner = SeverityAlignedAssigner(topk=10, num_classes=self.nc, alpha=0.5, beta=6.0)
         self.bbox_loss = BboxLoss(self.reg_max - 1, use_dfl=self.use_dfl).to(self.device)
-        self.sev_mse = nn.MSELoss(reduction="none")
+        self.sev_mse = nn.MSELoss(reduction="mean")
 
     def preprocess(self, targets, batch_size, scale_tensor):
         """Preprocesses the target counts and matches with the input batch size to output a tensor."""

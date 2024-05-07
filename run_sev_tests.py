@@ -9,7 +9,7 @@ from ultralytics import YOLO
 
 def test_sev():
     # Create a new YOLOv8n-OBB model from scratch
-    model = YOLO('yolov8x-sev.yaml', task="sev")
+    model = YOLO('yolov8l-sev.yaml', task="sev")
 
     data_yaml = Path("/home/david/production/severity42.2/dataset.yaml")
     # TODO: problem in ultralytics.data.augment.RandomPerspective.apply_bboxes assumes 4 points not 5. How
@@ -21,14 +21,14 @@ def test_sev():
         cache="RAM",
         device="0,1",  # "0,1",
         workers=8,
-        # lr0=0.1,  # ignored due to optimizer being in auto?
-        # optimizer='SGD',
-        # weight_decay=0.0025,
-        # max_det=30,
-        name="sevX42.2",
-        iou=0.4,
+        lr0=0.05,
+        optimizer='SGD',
+        weight_decay=0.0025,
+        max_det=30,
+        name="sev8l_42.2.",
+        iou=0.5,
         conf=0.2,
-        batch=20,
+        batch=36,
         project=Path("/home/david/production/sealed_roads_dataset/.train"),  # or could put it in "runs/severity/train"
         # amp=False  # connection reset error
     )

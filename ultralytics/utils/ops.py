@@ -229,10 +229,9 @@ def non_max_suppression(
     multi_label &= nc > 1  # multiple labels per box (adds 0.5ms/img)
 
     output = [torch.zeros((0, 6 + nm), device=prediction.device)] * bs
-    if count_likely == 0:
-        return output  # exit early
-    # TODO: remove the nex debugging line:
-    print("Finally, a non-zero confidence!")
+    # if count_likely == 0:
+    #     return output  # exit early
+
     prediction = prediction.transpose(-1, -2)  # shape(1,84,6300) to shape(1,6300,84)
     if not rotated:
         if in_place:
@@ -257,6 +256,8 @@ def non_max_suppression(
         # If none remain process next image
         if not x.shape[0]:
             continue
+        # TODO: remove the nex debugging line:
+        print("Finally, a non-zero confidence!")
 
         # Detections matrix nx6 (xyxy, conf, cls)
         box, cls, mask = x.split((4, nc, nm), 1)  # 'mask' encompasses all predictors surplus to bboxes, e.g. OBB angle

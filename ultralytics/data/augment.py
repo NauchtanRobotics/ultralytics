@@ -495,6 +495,7 @@ class RandomPerspective:
             return bboxes
 
         xy = np.ones((n * 4, 3), dtype=bboxes.dtype)
+        sev = bboxes[:, 4].copy().reshape(n, 1)
         xy[:, :2] = bboxes[:, [0, 1, 2, 3, 0, 3, 2, 1]].reshape(n * 4, 2)  # x1y1, x2y2, x1y2, x2y1
         xy = xy @ M.T  # transform
         xy = (xy[:, :2] / xy[:, 2:3] if self.perspective else xy[:, :2]).reshape(n, 8)  # perspective rescale or affine
@@ -502,7 +503,9 @@ class RandomPerspective:
         # Create new boxes
         x = xy[:, [0, 2, 4, 6]]
         y = xy[:, [1, 3, 5, 7]]
-        return np.concatenate((x.min(1), y.min(1), x.max(1), y.max(1)), dtype=bboxes.dtype).reshape(4, n).T
+        transformed = np.concatenate((x.min(1), y.min(1), x.max(1), y.max(1)), dtype=bboxes.dtype).reshape(4, n).T
+        bboxes_sev = np.concatenate([transformed, sev], axis=1)
+        return bboxes_sev
 
     def apply_segments(self, segments, M):
         """
@@ -1103,14 +1106,14 @@ def v8_transforms(dataset, imgsz, hyp, stretch=False):
         [
             Mosaic(dataset, imgsz=imgsz, p=hyp.mosaic),
             CopyPaste(p=hyp.copy_paste),
-            # RandomPerspective(
-            #     degrees=hyp.degrees,
-            #     translate=hyp.translate,
-            #     scale=hyp.scale,
-            #     shear=hyp.shear,
-            #     perspective=hyp.perspective,
-            #     pre_transform=None if stretch else LetterBox(new_shape=(imgsz, imgsz)),
-            # ),
+            RandomPerspective(
+                degrees=hyp.degrees,
+                translate=hyp.translate,
+                scale=hyp.scale,
+                shear=hyp.shear,
+                perspective=hyp.perspective,
+                pre_transform=None if stretch else LetterBox(new_shape=(imgsz, imgsz)),
+            ),
         ]
     )
     flip_idx = dataset.data.get("flip_idx", [])  # for keypoints augmentation
